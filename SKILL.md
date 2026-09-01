@@ -1,15 +1,15 @@
 ---
 name: academic-paper-review
-description: Reviews academic-paper abstracts for argument structure, problem-method mapping, component motivation, experimental scope, and claim-evidence consistency; supports professor-comment interpretation and blind regression review.
+description: Reviews academic-paper abstracts and introductions for argument structure, problem-method mapping, paragraph-level funnel and continuity, component motivation, experimental scope, and claim-evidence consistency; supports professor-comment interpretation and blind regression review.
 ---
 
-# Academic Paper Review Skill — Abstract Module v0.7 Candidate
+# Academic Paper Review Skill — Abstract + Introduction v0.8
 
 ## 1. Purpose
 
-This skill reviews the abstract of an academic paper using the author's manuscript and, when available, supervisor/professor annotations as the primary evidence.
+This skill reviews the Abstract and Introduction of an academic paper using the author's manuscript and, when available, supervisor/professor annotations as the primary evidence.
 
-The skill does not merely polish language. It reconstructs the abstract's argument chain, identifies why a comment was triggered, distinguishes surface wording problems from deeper reasoning problems, and converts repeated reviewer preferences into reusable review rules.
+The skill does not merely polish language. It reconstructs the Abstract's argument chain and the Introduction's paragraph-level funnel, identifies why a comment was triggered, distinguishes surface wording problems from deeper reasoning problems, and converts repeated reviewer preferences into reusable review rules.
 
 ## 2. Inputs
 
@@ -28,31 +28,29 @@ When the task explicitly requests a blind review or regression test, the manuscr
 - use only the manuscript text and any explicitly permitted non-annotation evidence;
 - do not open, recover, infer, quote, or search for annotations/comments;
 - do not use prior reviewer comments as evidence for the current decision;
-- report findings independently from the A01-A10 rules;
+- report findings independently from the applicable A01-A10 and I01-I03 rules;
 - if sanitized manuscript text is supplied, treat that sanitized text as the complete review input.
 
 Blind-mode results may later be compared with withheld reviewer comments by the evaluator, but the reviewer itself must not see those comments during the run.
 
-## 3. Scope of this module
+## 3. Scope and module routing
 
-This module handles the abstract only.
+This skill contains two section-specific modules.
 
-It should identify:
+**Abstract module (A01-A10):** reviews background/problem framing, research motivation, problem-to-solution correspondence, method narrative, experimental-scope reporting, claim-evidence consistency, unnecessary content, overclaiming, subjective evaluation, and sentence-level logical gaps.
 
-- background and problem framing;
-- research motivation;
-- problem-to-solution correspondence;
-- method narrative;
-- experimental-scope reporting;
-- claim-evidence consistency;
-- unnecessary content;
-- overclaiming and subjective evaluation;
-- logical gaps and hidden premises;
-- whether revisions actually address prior comments.
+**Introduction module (I01-I03):** reviews whether the Introduction performs new rhetorical work beyond the Abstract, narrows from the broad problem through the relevant research/solution landscape to the paper's specific gap, and maintains explicit paragraph-to-paragraph continuity.
+
+Routing rules:
+- If only an Abstract is supplied, run A01-A10 only.
+- If only an Introduction is supplied without an Abstract, run I02-I03; mark I01 not evaluable unless an Abstract is also available.
+- If both Abstract and Introduction are supplied, run both modules independently, then perform the I01 cross-section comparison.
+- Do not let a finding in one module substitute for required checks in the other module.
+- When professor/supervisor comments are supplied, map each comment to the section-specific rule that best explains its root cause.
 
 Language polishing is secondary and must occur only after the logical structure is reviewed.
 
-## 4. Core review model
+## 4. Abstract module: core review model
 
 Reconstruct the abstract as:
 
@@ -68,7 +66,7 @@ R -> C: Is the conclusion supported by the reported evidence without overclaimin
 
 If a transition requires the reader to infer an unstated premise, mark it as a logical gap.
 
-## 5. Abstract issue taxonomy
+## 5. Abstract module: issue taxonomy
 
 ### A01 — Low-information, removable, merge-only, or generic-definition sentence
 
@@ -343,21 +341,91 @@ Convert ledger entries into findings using these rules:
 
 Do not terminate because several severe findings have already been identified. The final coverage matrix must state Triggered / Checked-no-trigger / Uncertain for every A01-A10 rule and cite the exact sentence(s) checked. For every Checked-no-trigger decision under A04 or A07, include the exact bridge text that justifies the pass; if no such text can be quoted, it cannot be Checked-no-trigger.
 
-## 6. Professor-comment interpretation protocol
+
+## 6. Introduction module v0.5
+
+### 1. Purpose
+This module reviews an academic paper's Introduction as an argument that should expand beyond the abstract, narrow from the broad research problem to the paper's specific gap, and make paragraph-to-paragraph logic explicit.
+
+The Introduction is not treated as a longer abstract. It should perform additional rhetorical work: establish broader context, position the work in the defense/method landscape, derive a specific technical gap, motivate the chosen method family, and connect that gap to the paper's contributions.
+
+### 2. Core Introduction Structure
+Reconstruct the Introduction as:
+**Context / real-world problem → broad research landscape → target subproblem or method family → concrete limitation → research gap → proposed approach → contributions / evidence preview**
+The reviewer must inspect both the nodes and the transitions between them.
+
+### 3. Rules
+#### I01 — Abstract–Introduction role duplication
+Trigger: The first Introduction paragraph substantially replays the abstract's opening problem/motivation chain instead of changing the paragraph-level rhetorical function.
+
+Hard overlap-ratio test:
+1. Split Introduction P1 into independent substantive propositions. For each proposition, label it SAME (already present in the abstract with the same argumentative role), MIXED (partly repeats but adds a substantive new premise/mechanism/context), or NEW.
+2. Compute a qualitative weighted overlap ratio R = (SAME + 0.5 × MIXED) / total propositions. Show the counts so the decision is auditable.
+3. Trigger I01 when R is approximately 0.70 or higher AND at least three repeated/mixed propositions reproduce the abstract's problem chain in the same order. A near-verbatim chain covering most of P1 is a strong trigger.
+4. If R is between about 0.50 and 0.70, report high overlap but do not hard-trigger I01 unless the genuinely new material is only an appended consequence/example and does not create a distinct paragraph-level role.
+5. Substantive deployment/supply-chain context, historical or threat evolution, literature positioning, mechanism explanation, or a narrower research gap counts as NEW only when it introduces independent propositions—not merely new nouns attached to an old proposition. Two or more such independent new propositions can change the dominant role and prevent I01 even when some attack/background facts repeat.
+6. One appended consequence, citation, qualification, or example cannot by itself rescue a paragraph whose preceding chain is overwhelmingly the abstract rewritten.
+
+Compression test: compress all SAME propositions to one bridge sentence. If a coherent, substantial paragraph remains that performs a genuinely new role, do not trigger I01. If almost nothing remains except one minor consequence, trigger I01.
+
+Output: show Abstract A_i → Introduction I_j mappings, SAME/MIXED/NEW counts, approximate R, and the compression-test result.
+
+#### I02 — Premature narrowing / broken broad-to-narrow funnel
+Trigger: The Introduction is still discussing a broad research problem but jumps directly to one particular defense family, method, or implementation choice before positioning that choice within the broader landscape.
+Expected funnel: Broad problem → major solution/defense families → chosen subarea → limitations of that subarea → paper gap → proposed method.
+The Introduction does not need an exhaustive literature survey, but it must give enough landscape context that the selected subproblem does not look arbitrary or based on a single method.
+Hard test: For each paragraph, label scope L0 domain/application; L1 threat/broad problem; L2 broad solution/defense landscape; L3 selected method family/subproblem; L4 specific technical limitation; L5 this paper's solution.
+If narrative jumps from L1 directly to L3/L4 with wording such as “one practical defense is …” without establishing L2, trigger I02 unless scope was already explicitly restricted and justified.
+Output: show current scope sequence and missing layer, e.g. Backdoor risk (L1) → [missing defense landscape, L2] → detection-guided purification (L3).
+
+#### I03 — Paragraph-edge logical discontinuity
+Trigger: A new paragraph introduces a new problem, mechanism, variable, or technical limitation whose reason for appearing now is not established by the previous paragraph. Mere topic-word overlap is not enough.
+
+Hard paragraph-edge test for every P_i → P_{i+1}:
+1. Write the final substantive proposition of P_i as X and the first substantive proposition of P_{i+1} as Y.
+2. Classify the edge as one of: EXPLICIT-CAUSAL (X directly motivates Y), EXPLICIT-SCOPE (Y explicitly narrows/extends the object established by X), TOPIC-ONLY (same general topic/terms but the new limitation is not derived), or UNSTATED.
+3. Ask: “Why does Y follow now?” If answering requires an additional proposition R that is not locally stated, trigger I03 for TOPIC-ONLY or UNSTATED edges.
+4. Transition words such as when, however, therefore, we consider, or repeated terms such as detection/purification do not by themselves establish the bridge. Test the semantic relation, not lexical continuity.
+5. Hard pattern — SETTING-TO-LIMITATION JUMP: if P_i mainly defines resources, access assumptions, data, or operating setting, while P_{i+1} suddenly introduces a failure of a particular internal decision/interface/algorithmic convention, trigger I03 unless the text explicitly says that the selected pipeline uses that convention or explains why the setting leads to that limitation.
+6. SELECTED-METHOD LIMITATION EXCEPTION: do not trigger I03 merely because the next paragraph narrows from an explicitly named method/subarea to a limitation of that same method's plainly identifiable parameter, threshold, component, or operating choice. Examples: “trajectory smoothing” → “fixed smoothing thresholds”; “control filtering” → “fixed filtering thresholds.” This is EXPLICIT-SCOPE when the referent is unambiguous. This exception does NOT apply when the prior paragraph only states a broad setting/resource (“risk calibration and purification”) and the next paragraph introduces a previously unstated internal interface convention (“only a binary decision is passed to the update stage”).
+7. I02/I03 NON-DUPLICATION: scope-layer omissions belong to I02, not I03. If P_{i+1} is explicitly framed as a solution/defense/approach that responds to the broad problem in P_i (for example, “One practical solution/defense is …”), and the only missing material is the L2 solution landscape or justification for selecting that family, classify the paragraph edge itself as EXPLICIT-CAUSAL and trigger I02 only. Trigger I03 as well only if there is an additional semantic gap beyond the missing landscape.
+8. Do not trigger when P_i ends by stating a need/constraint and P_{i+1} directly supplies the mechanism or observation that addresses that exact need.
+
+Represent a failure as X → [missing bridge R] → Y.
+Output: quote X and Y, give the edge class, state the missing R when triggered, and say where the bridge should be inserted.
+
+### 4. Mandatory Introduction Ledger
+Before free-form comments, create:
+| Paragraph | Main function | Scope level | New information beyond abstract | Link from previous paragraph | Status |
+|---|---|---|---|---|---|
+Also create cross-section overlap ledger:
+| Abstract proposition | Introduction proposition | Same function or new function? | I01 status |
+|---|---|---|---|
+
+### 5. Review Order
+1. Compare abstract motivation/problem block with first Introduction paragraph (I01).
+2. Reconstruct Introduction broad-to-narrow scope ladder (I02).
+3. Test every paragraph boundary for “why now?” continuity (I03).
+4. Only after structural checks, review local language and citation wording.
+
+### 6. Blind Regression Mode
+When blind testing this module, do not expose professor/supervisor annotations to the reviewer. Supply only annotation-free manuscript text. The evaluator may compare the output with withheld annotations after the run.
+
+## 7. Professor-comment interpretation protocol
 
 For every professor comment, produce five layers:
 
 1. Comment target: exact sentence/phrase and location.
 2. Surface issue: what appears wrong locally.
 3. Root cause: the deeper argument, structure, evidence, or information-design problem.
-4. Generalizable rule: which abstract-review rule this comment represents.
+4. Generalizable rule: which section-specific A-rule or I-rule this comment represents.
 5. Revision criterion: what must become true for the comment to count as resolved.
 
 Do not treat the professor's wording as a simple copy-edit instruction when the surrounding context shows a deeper reasoning issue.
 
-## 7. Revision comparison protocol
+## 8. Revision comparison protocol
 
-When both an earlier and a revised abstract exist:
+When both an earlier and a revised version of an in-scope section exist:
 
 For each prior comment, label the revision as:
 
@@ -369,11 +437,13 @@ For each prior comment, label the revision as:
 
 A lexical change is not sufficient evidence of resolution.
 
-## 8. Required output format
+## 9. Required output format
+
+Use A-G when the Abstract is in scope. Use H when the Introduction is in scope. When both are present, produce both section outputs before cross-section synthesis.
 
 ### A. Overall diagnosis
 
-Give a concise judgment of the abstract's main structural weakness, not a generic language-quality statement.
+Give a concise judgment of the in-scope section's main structural weakness, not a generic language-quality statement. If both Abstract and Introduction are in scope, give one sentence for each before cross-section synthesis.
 
 ### B. Argument-chain reconstruction
 
@@ -414,7 +484,20 @@ Only produce a rewritten abstract or replacement sentences if requested, or if t
 
 The rewrite must not introduce new experimental claims, new contributions, new datasets, new baselines, or new causal conclusions that are absent from the source manuscript.
 
-## 9. Review priorities
+### H. Introduction review output (when an Introduction is in scope)
+
+Before free-form Introduction comments, include:
+
+1. Introduction ledger: Paragraph | Main function | Scope level | New information beyond abstract | Link from previous paragraph | Status.
+2. Abstract-Introduction overlap ledger for I01 when the Abstract is available.
+3. I01 verdict with SAME/MIXED/NEW counts, approximate overlap ratio R, and compression-test result.
+4. I02 verdict with the L0-L5 scope chain and any missing layer.
+5. I03 verdict for every adjacent paragraph edge, including X, Y, edge class, and any missing bridge R.
+6. A final Introduction coverage line stating Triggered / Checked-no-trigger / Not-evaluable for I01-I03.
+
+When both sections are reviewed, keep Abstract and Introduction findings separate before giving any cross-section synthesis.
+
+## 10. Review priorities
 
 Priority order:
 
@@ -428,7 +511,7 @@ Priority order:
 
 Do not begin with grammar corrections when a higher-level problem exists.
 
-## 10. Current professor-style patterns learned from the provided examples
+## 11. Current professor-style patterns learned from the provided examples
 
 From the supplied DPRC and MARU examples, the observed review preference is:
 
@@ -439,11 +522,14 @@ From the supplied DPRC and MARU examples, the observed review preference is:
 - do not advertise a property unless the paper actually demonstrates it;
 - do not use author-side value labels when direct evidence is available;
 - make experiment counts interpretable;
-- when multiple problems are stated, make their corresponding designs traceable.
+- when multiple problems are stated, make their corresponding designs traceable;
+- the Introduction should add a distinct rhetorical function instead of replaying the Abstract's motivation chain;
+- move from broad problem to solution/research landscape before narrowing to one selected subarea unless the scope restriction is explicitly justified;
+- at paragraph boundaries, make the "why now?" relation explicit when a new technical limitation or mechanism appears.
 
-These patterns are evidence from the current example set, not universal academic-writing laws. If future professor comments contradict or refine them, update this section rather than forcing new examples into old rules.
+These patterns are evidence from the current Abstract and Introduction example set, not universal academic-writing laws. If future professor comments contradict or refine them, update this section rather than forcing new examples into old rules.
 
-## 11. Non-invention constraints
+## 12. Non-invention constraints
 
 The skill must not:
 
@@ -456,14 +542,18 @@ The skill must not:
 
 When uncertain, output: "The current materials do not establish this point clearly." and identify what evidence would be needed.
 
-## 12. Test case for this module
+## 13. Regression and blind-evaluation protocol
 
-Use the MARU abstract pair as a regression test.
+Keep regression fixtures and expected outcomes outside the Skill file used by the reviewer. The reviewer-facing Skill must not contain target sentences, withheld comments, gold labels, or case-specific expected verdicts.
 
-Expected behavior:
+For blind regression:
 
-- detect that "48 settings" is less informative than a decomposition into datasets, attacks, and models;
-- identify that introducing many method terms without a causal spine creates concept overload;
-- recognize that "small trusted clean set" can become an unsupported headline claim if no corresponding evidence is established;
-- distinguish a wording change from a genuine repair of the underlying logic;
-- treat the revised abstract as improved where it converts module listing into a reference -> deviation -> risk -> threshold -> margin -> purification chain, while still allowing new logical issues to be flagged.
+- provide only this Skill plus annotation-free manuscript text and explicitly permitted manuscript evidence;
+- keep professor/supervisor comments and gold decisions in an evaluator-only file that is never included in the reviewer prompt;
+- run section modules according to the routing rules in Section 3;
+- when both Abstract and Introduction are present, verify that adding the second module does not change previously validated decisions in the first module without textual reason;
+- repeat borderline cases across multiple independent runs and report hit frequency rather than relying on a single run;
+- include positive and negative controls so that a rule is tested for both recall and false-positive behavior;
+- when synthetic controls are used, change domain vocabulary and surface phrasing while preserving the underlying argument structure.
+
+The evaluator may compare blind outputs with withheld labels only after each run has finished.
