@@ -3,7 +3,7 @@ name: academic-paper-review
 description: Reviews academic-paper front sections (Abstract, Introduction, Related Work, and Problem-Formulation/Method boundaries) for argument structure, problem-method mapping, paragraph continuity, taxonomy coherence, section ownership, explicit referents, experimental evidence, and professor-comment alignment; supports blind regression review.
 ---
 
-# Academic Paper Review Skill — Front-Section Review v0.9
+# Academic Paper Review Skill — Front-Section Review v0.16
 
 ## 1. Purpose
 
@@ -82,7 +82,13 @@ Hard test:
 1. Replace the pronoun/reference with the intended noun phrase.
 2. If the sentence becomes materially clearer with little cost, flag X01.
 3. If two antecedents are plausible, flag X01 strongly.
-4. Do not flag a pronoun merely because it is a pronoun. A local, unique, unmistakable referent is acceptable.
+4. Do not flag a pronoun merely because it is a pronoun. A local, unique, unmistakable referent is normally acceptable.
+5. Stricter front-section pattern: when a paragraph-opening definition names the paper's technical object and the next sentence begins with a bare plural pronoun such as `They`, repeat the technical noun if that sentence establishes domain, use, scope, or motivation. In this position, the explicit noun improves topic anchoring at negligible cost even if the antecedent is grammatically recoverable.
+6. Do not generalize item 5 to every immediate `it/they`: a singular pronoun that continues one unmistakable method subject in the same local operation remains acceptable.
+7. ABSTRACT-LABEL ANAPHOR: treat compact labels such as `this vulnerability`, `this issue`, `this risk`, or `this concern` more strictly when the preceding sentence contains several candidate causes, settings, or security concepts. If replacing the label with a concrete noun phrase forces a choice among those candidates, trigger X01 even when the intended general topic is inferable. Do not trigger when the immediately preceding clause explicitly names one unique antecedent, as in `this interface` after a sentence that has just defined the interface.
+8. REFERENTIAL RELABELING: if the antecedent is stated as one argumentative category (for example, a `security concern`, deployment condition, or integrity problem) and the next sentence silently renames it as `this vulnerability` or `this issue`, require the concrete threatened object or mechanism to remain explicit. A reader should not have to infer whether the label refers to the condition, the concern, or the causal weakness.
+9. RULE-INDEPENDENCE GUARD: run X01 independently of X02/A03. A stronger causal or role-conflation finding does not suppress a referent finding. In particular, bare summaries such as `both types` or `these two` should still trigger X01 when the exact paired nouns are absent or expensive to reconstruct, even if the same sentence also triggers X02.
+10. EXCERPT-BOUNDARY GUARD: if an anaphoric phrase occurs at the very start of a supplied excerpt and its antecedent is simply outside the excerpt, do not convert missing excerpt context into a definite X01 finding. Mark X01 uncertain only when the omitted context prevents adjudication. Trigger X01 only when the supplied text itself establishes ambiguity, competing antecedents, or a misleading relabeling. This guard does not apply to anaphors such as `this vulnerability` that follow a supplied sentence containing several candidate concepts.
 
 Output:
 
@@ -185,6 +191,8 @@ Hard pattern: generic opening definitions are not automatically useful. If the n
 
 Exception: keep a generic-looking sentence only when it supplies the unique concrete causal antecedent used by the next claim.
 
+Hard merge pattern: if a sentence only defines a reference object or generic state that the next sentence immediately consumes (for example, `trusted samples establish normal behavior` followed by a method measuring deviation from `this reference`), rerun the deletion test after replacing the anaphor with the concrete noun phrase. If the scientific proposition is preserved, mark the first sentence MERGE-ONLY or DELETE-CANDIDATE rather than keeping it merely as an antecedent supplier.
+
 Output: KEEP / MERGE-ONLY / DELETE-CANDIDATE and the exact unique proposition count.
 
 ## A02 — Motivation built on a weak conditional scenario
@@ -206,7 +214,12 @@ Output the current conditional chain and the objective chain that should replace
 
 Trigger on because/therefore/thus/hence/consequently or equivalent summary moves when Q does not follow locally from P.
 
-Hard pattern: a sentence that invents abstract labels for preceding concrete facts and then uses those labels to derive a conclusion is weak unless the labels add a real causal mechanism.
+Hard patterns:
+
+1. A sentence that invents abstract labels for preceding concrete facts and then uses those labels to derive a conclusion is weak unless the labels add a real causal mechanism.
+2. ABSTRACT-GAP SEQUENCING: if an Abstract moves from a broad task/privacy/utility statement directly to `existing methods do X, which causes Y`, test whether the preceding text has actually established why X is technically inadequate for the synthesis objective. If the key consistency criterion, reconstruction difficulty, or other missing premise appears only after the prior-work limitation, flag the bridge rather than treating adjacency as explanation.
+3. RENAMED-RISK BRIDGE: changing concrete facts into labels such as `opaque provenance`, `trigger-dependent behavior`, `heterogeneity`, or `complexity` and then writing `therefore this creates a risk/need` does not by itself supply a mechanism. Trigger when the conclusion depends on the relabeling rather than an explicit consequence chain.
+4. RULE-INDEPENDENCE GUARD: run A03 independently of X02. If an Abstract first states a broad requirement in a conceptually flawed or conflated way and then immediately presents `existing methods do X, which causes Y`, still test whether the missing technical criterion linking X to Y was established. An X02 finding in the earlier sentence does not resolve or suppress a separate A03 sequencing gap.
 
 Represent as:
 
@@ -289,10 +302,18 @@ Trigger when the Abstract advertises a property that the paper does not directly
 - generalizable;
 - low-cost;
 - data-efficient;
-- small trusted set;
+- small / limited / few trusted samples;
 - few-shot.
 
-Recommend weakening/removing the property or adding direct evidence.
+Hard distinction for resource phrases such as `small trusted set`, `limited trusted clean data`, or `few trusted samples`:
+
+1. If the phrase merely states an operating condition — for example, the defender has a fixed trusted set of a stated size — treat it as a neutral assumption and do not infer data efficiency.
+2. If the wording presents scarcity itself as an advantage — for example, `only a small set is required`, `works with limited data`, or `suitable for low-resource deployment` — require direct supporting evidence such as trusted-set-size sensitivity, sample-efficiency analysis, or another bounded experiment.
+3. Using one fixed trusted-set size does not by itself establish that the method is data-efficient or that the set is objectively `small`.
+4. A later limitation that says the method `requires a limited number of trusted samples` does not retroactively validate an Abstract capability claim.
+5. NEUTRAL-PREPOSITIONAL CONDITION: wording of the form `a framework ... with a small/limited trusted set` is a neutral operating condition when it merely names what data the defender has. In that form, and without scarcity-as-advantage markers such as `only`, `requires just`, `works with limited data`, `data-efficient`, or `suitable for low-resource deployment`, mark A10 checked-no-trigger rather than uncertain. Do not demand a trusted-set sensitivity study merely to justify the existence of that operating condition.
+
+Recommend weakening/removing the property, rewriting it as a neutral operating assumption, or adding direct evidence.
 
 ## 5.2 Abstract mandatory execution
 
@@ -350,6 +371,8 @@ Trigger I01 when:
 - R is about 0.70 or higher; and
 - at least three SAME/MIXED propositions replay the Abstract's chain in substantially the same order.
 
+Compact-opening exception: when the supplied Abstract/Introduction comparison contains only a short opening block, trigger I01 with two strongly equivalent propositions if they cover essentially the whole supplied opening, preserve the same order, and add little or no NEW rhetorical work. Do not use this exception when the Introduction adds a distinct deployment perspective, task definition, causal mechanism, or other independent proposition.
+
 Compression test:
 
 Compress all repeated propositions to one bridge sentence. If little substantial new rhetorical work remains, trigger I01.
@@ -369,6 +392,8 @@ Label paragraph scope:
 
 Trigger when the Introduction jumps from L1 to L3/L4 without enough L2 positioning, unless the scope restriction is explicitly justified.
 
+Hard funnel pattern: `broad threat/risk -> one practical defense is [specific family]` is an L1 -> L3 jump when no broader defense landscape or explicit scope-selection rationale appears between them. Local coherence is not sufficient: the reader must also understand where the chosen family sits among the plausible defense directions. A sentence that first names the broader landscape and then narrows to the selected family is a negative control.
+
 ## I03 — Paragraph-edge logical discontinuity
 
 For every P_i -> P_{i+1}:
@@ -387,6 +412,8 @@ If the answer requires missing R, trigger I03:
 X -> [missing R] -> Y
 
 Transition words and repeated topic nouns do not by themselves establish the bridge.
+
+Hard setting-to-limitation pattern: a paragraph that only defines defender access, trusted data, or the deployment setting does not by itself motivate a specific limitation of a downstream interface such as binary suspicious/non-suspicious decisions. Before introducing that limitation, the text should establish the missing interface premise — for example, that suspicious-sample detection is the mechanism connecting the trusted reference to model updating and that its output is what purification receives. Without that bridge, trigger I03 even when both paragraphs concern the same defense setting.
 
 ## I04 — Challenge-to-contribution closure
 
@@ -427,6 +454,9 @@ Two hard patterns:
 
 2. GAP-THEN-BACKTRACK:
    the text has already established a specific gap, then backs up to re-explain the general task/setting instead of introducing the proposed approach.
+
+3. LIMITATION-THEN-TASK-RESET:
+   the text has already stated a concrete observation or limitation (for example, one static view cannot characterize diverse triggers) and then inserts `This paper focuses on [task]` plus a generic task objective. If that task definition is a prerequisite for interpreting the limitation, move it earlier; if it is not, introduce the proposed work directly instead of resetting the funnel.
 
 Output the current order and the corrected rhetorical order.
 
@@ -480,8 +510,13 @@ prior work -> capability -> limitation/gap
 
 Then, at the end of a subsection or the Related Work section, a short positioning sentence may explain how the current paper differs.
 
-Hard rule:
-Do not use the paper's own mechanism as the main evidence that prior work is limited.
+Hard rules:
+
+1. Do not use the paper's own mechanism as the main evidence that prior work is limited.
+2. A single concise current-paper positioning sentence is allowed after the paragraph or subsection has objectively established the prior-work behavior/capability and the comparison axis. It need not first prove a deficiency if the sentence merely states a high-level difference and does not infer that prior work is inadequate. Trigger R02 when the current-method sentence itself supplies an unstated limitation, requirement, or negative inference about prior methods, even if `our` appears only once.
+3. When the same sentence also gives scoring operators, branch behavior, fusion logic, or other internal mechanics, R04 may co-trigger; R02 remains the primary voice/positioning issue when the objective gap has not yet been established.
+4. EVALUATION-DESIGN LEAKAGE: a Related Work sentence such as `this motivates our evaluation`, `we evaluate under`, or `our experiments cover` normally shifts from literature synthesis into the current paper's experimental design. Flag R02 unless the sentence is necessary to state a high-level comparison boundary and does not enumerate the paper's scenarios, attacks, datasets, metrics, or evaluation protocol. Move detailed evaluation justification to the experimental setup.
+5. SELF-CONTRAST-AS-GAP: a pattern such as `Prior methods do X. Our method does not require Y; instead it does Z` is not an objective literature gap when the prior sentence has not established that Y is actually an assumption or limitation of those methods. Trigger R02 even when the current-method sentence is concise; concision does not convert an author-supplied contrast into literature evidence.
 
 ## R03 — Literature-transition and term-relation discontinuity
 
@@ -495,6 +530,8 @@ A valid edge should make one of these relations explicit:
 - limitation -> next family or unresolved gap.
 
 Trigger when "therefore" or a subsection change jumps between levels without establishing the relation, or when the reader must infer how two named research categories relate.
+
+Hard specificity pattern: evidence or conclusions stated for a broad `defense` landscape do not automatically establish requirements for one narrower family such as training-data cleansing. A transition of the form `attack/trigger/label mapping affects defense results -> therefore cleansing methods must handle ...` needs an explicit bridge showing why that evidence applies to cleansing and how the named trigger properties affect its operational objective. Without that relation, trigger R03 even if the concluding requirement sounds plausible.
 
 Output:
 
@@ -577,6 +614,8 @@ Trigger when:
 
 Prefer a substantive opening. Use a closing transition only when it carries a real logical relation.
 
+Co-trigger rule: when the closing sentence of Related Work replaces a substantive literature/gap closure with author-side staging such as `our method has ...; Section 3 presents ...; Section 4 evaluates ...`, trigger S02 for the failed section closing. X03 may co-trigger for empty navigation and R02 may co-trigger for premature own-method voice; neither substitutes for S02 when the failure is specifically at the section boundary.
+
 ## S03 — Boundary between problem definition and solution design
 
 Problem Formulation should define what must be solved, under what assumptions, and what output is required.
@@ -621,6 +660,15 @@ When earlier and revised versions exist, label each prior issue:
 - New issue introduced.
 
 A lexical change is not enough. The underlying logic, role, evidence, or section placement must be fixed.
+
+Hard revision check — lexical weakening is not resolution:
+
+- `small` -> `limited`;
+- `effective` -> `useful`;
+- `robust` -> `stable`;
+- replacing one causal connector with a softer connector.
+
+If the underlying proposition and its evidence gap remain the same, label the issue Partially resolved, Reframed, or Unresolved rather than Resolved. Re-run the original rule against the revised proposition, not merely against the revised adjective or connector.
 
 ---
 
@@ -742,5 +790,16 @@ For professor-comment regression, score:
 - rule precision: did it avoid flagging nearby text that the comment does not support?
 - section-placement accuracy: did it identify where the material belongs?
 - explanation quality: did it reconstruct the missing causal or rhetorical link rather than merely echoing the comment?
+
+Decision-boundary guardrails for blind runs:
+
+- A02: ordinary scientific uncertainty or one local hedge is not enough; the motivation itself must depend on a stack of weak hypothetical premises.
+- A04: do not require one-to-one cardinality. Do not trigger when each stated problem is explicitly answered, even if one design answers multiple problems or one problem requires multiple designs.
+- A05: naming several components is not enough when the core mechanism is already clear and each name is interpretable in that mechanism.
+- A06: sequence words such as `first` and `then` are not enough when purpose and consequence are also explicit.
+- A07: do not flag a component whose nearest need and output are stated locally.
+- A09: a number such as `48 settings` is acceptable when its composition is stated in the same or immediately adjacent sentence.
+- S01/S03: a high-level preview or cross-reference is not a section-ownership violation; trigger only when substantive solution detail occupies the wrong section or task assumptions are deferred into Method.
+- S02: a section-closing sentence is acceptable when it carries a substantive narrowing, contrast, or gap; do not require deletion merely because it prepares the next section.
 
 The evaluator may compare blind outputs with withheld annotations only after each run has finished.
