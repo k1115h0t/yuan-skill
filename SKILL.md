@@ -1,559 +1,805 @@
 ---
 name: academic-paper-review
-description: Reviews academic-paper abstracts and introductions for argument structure, problem-method mapping, paragraph-level funnel and continuity, component motivation, experimental scope, and claim-evidence consistency; supports professor-comment interpretation and blind regression review.
+description: Reviews academic-paper front sections (Abstract, Introduction, Related Work, and Problem-Formulation/Method boundaries) for argument structure, problem-method mapping, paragraph continuity, taxonomy coherence, section ownership, explicit referents, experimental evidence, and professor-comment alignment; supports blind regression review.
 ---
 
-# Academic Paper Review Skill — Abstract + Introduction v0.8
+# Academic Paper Review Skill — Front-Section Review v0.16
 
 ## 1. Purpose
 
-This skill reviews the Abstract and Introduction of an academic paper using the author's manuscript and, when available, supervisor/professor annotations as the primary evidence.
+This skill reviews the front sections of an academic paper using the manuscript and, when available, professor/supervisor annotations as the primary evidence.
 
-The skill does not merely polish language. It reconstructs the Abstract's argument chain and the Introduction's paragraph-level funnel, identifies why a comment was triggered, distinguishes surface wording problems from deeper reasoning problems, and converts repeated reviewer preferences into reusable review rules.
+The review is not a grammar pass. Its main job is to reconstruct the paper's argument, identify why a reader or reviewer is forced to infer missing logic, detect when a section performs the wrong rhetorical job, and convert repeated professor comments into reusable review rules.
 
-## 2. Inputs
+The supported modules are:
 
-Required when available:
+- Abstract: A01-A10.
+- Introduction: I01-I05.
+- Related Work: R01-R05.
+- Cross-cutting prose/logic rules: X01-X03.
+- Section architecture and ownership: S01-S03.
 
-- Original manuscript PDF.
-- Revised manuscript PDF, if a revision exists.
-- Professor/supervisor annotated PDF or comment PDF.
+Language polishing is secondary and must occur only after higher-level logic, evidence, and section-role checks.
 
-The skill must treat the uploaded materials as the source of truth. It must not silently add claims, experimental evidence, motivations, or contributions that are not supported by the manuscript or comments.
+## 2. Inputs and evidence discipline
+
+Use, when available:
+
+- Original manuscript PDF or source text.
+- Revised manuscript PDF or source text.
+- Professor/supervisor annotated PDF or comment document.
+- Explicitly supplied experimental tables, figures, or appendices needed to verify claims.
+
+Treat supplied materials as the source of truth. Do not silently invent claims, experiments, motivations, contributions, section intent, or causal relationships.
+
+When a professor comment is ambiguous, state the ambiguity and identify the strongest interpretation supported by the local context.
 
 ### Blind regression mode
 
-When the task explicitly requests a blind review or regression test, the manuscript text must be analyzed without professor/supervisor annotations, comments, highlighted notes, review summaries, or any other hidden review material. In blind mode:
+When the task explicitly requests blind review or regression testing:
 
-- use only the manuscript text and any explicitly permitted non-annotation evidence;
-- do not open, recover, infer, quote, or search for annotations/comments;
-- do not use prior reviewer comments as evidence for the current decision;
-- report findings independently from the applicable A01-A10 and I01-I03 rules;
-- if sanitized manuscript text is supplied, treat that sanitized text as the complete review input.
+- analyze only annotation-free manuscript text and explicitly permitted evidence;
+- do not open, recover, quote, infer, or search for withheld annotations;
+- do not use prior professor comments as evidence for the current decision;
+- run every applicable rule independently;
+- keep evaluator-only labels and comments outside this Skill file.
 
-Blind-mode results may later be compared with withheld reviewer comments by the evaluator, but the reviewer itself must not see those comments during the run.
+## 3. Module routing
 
-## 3. Scope and module routing
+Route by supplied sections.
 
-This skill contains two section-specific modules.
+- Abstract only: run A01-A10 plus X01-X03.
+- Introduction only: run I02-I05 plus X01-X03; mark I01 not evaluable without the Abstract.
+- Abstract + Introduction: run both modules separately, then I01 cross-section comparison.
+- Related Work: run R01-R05 plus X01-X03 and S01-S03 where section placement is relevant.
+- Problem Formulation / Threat Model / Method opening: run S01-S03 plus X01-X03; use Introduction or Related Work findings only when adjacent section logic is available.
+- Whole front section: run all applicable modules. Do not let one module's finding substitute for another module's required checks.
 
-**Abstract module (A01-A10):** reviews background/problem framing, research motivation, problem-to-solution correspondence, method narrative, experimental-scope reporting, claim-evidence consistency, unnecessary content, overclaiming, subjective evaluation, and sentence-level logical gaps.
+When professor comments are supplied, map each comment to the rule that best explains the root cause. One comment may map to more than one rule, but identify one primary rule.
 
-**Introduction module (I01-I03):** reviews whether the Introduction performs new rhetorical work beyond the Abstract, narrows from the broad problem through the relevant research/solution landscape to the paper's specific gap, and maintains explicit paragraph-to-paragraph continuity.
+---
 
-Routing rules:
-- If only an Abstract is supplied, run A01-A10 only.
-- If only an Introduction is supplied without an Abstract, run I02-I03; mark I01 not evaluable unless an Abstract is also available.
-- If both Abstract and Introduction are supplied, run both modules independently, then perform the I01 cross-section comparison.
-- Do not let a finding in one module substitute for required checks in the other module.
-- When professor/supervisor comments are supplied, map each comment to the section-specific rule that best explains its root cause.
+# 4. Cross-cutting rules
 
-Language polishing is secondary and must occur only after the logical structure is reviewed.
+These rules apply across Abstract, Introduction, Related Work, Problem Formulation, and Method openings.
 
-## 4. Abstract module: core review model
+## X01 — Ambiguous or lazy anaphora / unclear referent
 
-Reconstruct the abstract as:
+Trigger when a pronoun or compact reference such as:
+
+- this / that / these / those;
+- it / they / them / their;
+- both / both types / such;
+- the former / the latter;
+- this issue / this vulnerability / this setting / this behavior;
+
+forces the reader to reconstruct the referent, especially when two or more candidate antecedents exist or when the intended noun phrase is short enough to repeat explicitly.
+
+This rule reflects a strict academic-writing preference: do not make the reader resolve a reference when repeating the exact technical noun is cheap and clearer.
+
+Hard test:
+
+1. Replace the pronoun/reference with the intended noun phrase.
+2. If the sentence becomes materially clearer with little cost, flag X01.
+3. If two antecedents are plausible, flag X01 strongly.
+4. Do not flag a pronoun merely because it is a pronoun. A local, unique, unmistakable referent is normally acceptable.
+5. Stricter front-section pattern: when a paragraph-opening definition names the paper's technical object and the next sentence begins with a bare plural pronoun such as `They`, repeat the technical noun if that sentence establishes domain, use, scope, or motivation. In this position, the explicit noun improves topic anchoring at negligible cost even if the antecedent is grammatically recoverable.
+6. Do not generalize item 5 to every immediate `it/they`: a singular pronoun that continues one unmistakable method subject in the same local operation remains acceptable.
+7. ABSTRACT-LABEL ANAPHOR: treat compact labels such as `this vulnerability`, `this issue`, `this risk`, or `this concern` more strictly when the preceding sentence contains several candidate causes, settings, or security concepts. If replacing the label with a concrete noun phrase forces a choice among those candidates, trigger X01 even when the intended general topic is inferable. Do not trigger when the immediately preceding clause explicitly names one unique antecedent, as in `this interface` after a sentence that has just defined the interface.
+8. REFERENTIAL RELABELING: if the antecedent is stated as one argumentative category (for example, a `security concern`, deployment condition, or integrity problem) and the next sentence silently renames it as `this vulnerability` or `this issue`, require the concrete threatened object or mechanism to remain explicit. A reader should not have to infer whether the label refers to the condition, the concern, or the causal weakness.
+9. RULE-INDEPENDENCE GUARD: run X01 independently of X02/A03. A stronger causal or role-conflation finding does not suppress a referent finding. In particular, bare summaries such as `both types` or `these two` should still trigger X01 when the exact paired nouns are absent or expensive to reconstruct, even if the same sentence also triggers X02.
+10. EXCERPT-BOUNDARY GUARD: if an anaphoric phrase occurs at the very start of a supplied excerpt and its antecedent is simply outside the excerpt, do not convert missing excerpt context into a definite X01 finding. Mark X01 uncertain only when the omitted context prevents adjudication. Trigger X01 only when the supplied text itself establishes ambiguity, competing antecedents, or a misleading relabeling. This guard does not apply to anaphors such as `this vulnerability` that follow a supplied sentence containing several candidate concepts.
+
+Output:
+
+- quote the ambiguous reference;
+- name the plausible antecedent(s);
+- recommend the exact noun phrase or a more explicit construction.
+
+## X02 — Concept-role conflation or invalid causal framing
+
+Trigger when a sentence mixes concepts that play different roles in the argument and therefore states an invalid or misleading relationship.
+
+Typical roles include:
+
+- task / release setting;
+- threat or protected object;
+- privacy/security requirement;
+- utility or fidelity objective;
+- observed limitation;
+- method mechanism;
+- evaluation metric;
+- evidence.
+
+Examples of risky structures:
+
+- treating a utility objective as if it were the privacy requirement itself;
+- claiming that "releasing useful data requires preserving X" without distinguishing protection from utility preservation;
+- moving from a broad threat statement to a specific method requirement without an intermediate premise;
+- using "therefore" after statements that do not establish the category or scope of the conclusion.
+
+Role-ledger test:
+
+| Phrase | Role |
+|---|---|
+| What is being done? | task/setting |
+| What must be protected? | security/privacy requirement |
+| What should remain useful? | utility objective |
+| What currently fails? | limitation/gap |
+| What changes that failure? | method mechanism |
+| What proves it? | evidence |
+
+If one sentence silently swaps roles or derives one role from another without a bridge, trigger X02.
+
+Represent failures as:
+
+P -> [missing role/causal premise] -> Q
+
+Output the missing premise or recommend splitting the sentence so that protection, utility, gap, and mechanism are stated separately.
+
+## X03 — Empty meta-navigation or author-side stage directions
+
+Trigger on prose that mainly tells the reader what the next section will do, announces obvious document structure, or narrates the author's writing process without adding scientific content.
+
+Examples:
+
+- "The next section formalizes..."
+- "We next discuss..."
+- "The remainder of this section is organized as follows..."
+
+Do not trigger when navigation is genuinely necessary for a complicated proof/algorithm dependency or mandated by venue style.
+
+Default decision for short research papers: DELETE or relocate to a section opening only if it materially improves navigation.
+
+---
+
+# 5. Abstract module
+
+## 5.1 Core model
+
+Reconstruct the Abstract as:
 
 Background (B) -> Problem (P) -> Gap (G) -> Method (M) -> Results (R) -> Conclusion (C)
 
-Then inspect the five transitions:
+Test:
 
-B -> P: Does the stated background actually establish the research problem?
-P -> G: Does the manuscript explain what is missing or inadequate?
-G -> M: Does each major design choice clearly respond to the stated gap?
-M -> R: Do the reported experiments test the claimed method contributions?
-R -> C: Is the conclusion supported by the reported evidence without overclaiming?
+- B -> P: Does the background actually establish the research problem?
+- P -> G: Is the missing capability/limitation explicit?
+- G -> M: Does each major design respond to the stated gap?
+- M -> R: Do reported experiments test the claimed contributions?
+- R -> C: Does the conclusion stay inside the evidence boundary?
 
-If a transition requires the reader to infer an unstated premise, mark it as a logical gap.
+If the reader must infer an unstated premise, mark the transition weak.
 
-## 5. Abstract module: issue taxonomy
+## A01 — Low-information, removable, merge-only, or generic-definition sentence
 
-### A01 — Low-information, removable, merge-only, or generic-definition sentence
+Run on every Abstract sentence.
 
-Trigger:
-A sentence is correct but its UNIQUE INFORMATION is too small to justify a standalone abstract sentence. A01 is about information value, not grammar and not merely whether two sentences can be combined syntactically.
+Deletion test:
 
-Run two separate tests.
+1. Delete the sentence.
+2. Repair simple anaphora.
+3. Ask which unique proposition disappears.
+4. If no paper-specific problem, gap, mechanism, contribution, evidence boundary, or constraint is lost, mark DELETE-CANDIDATE.
 
-Test A — deletion test:
-Delete the sentence, minimally repair anaphora (for example "this reference"), and ask whether the paper-specific problem, gap, mechanism, contribution, result, or evidence boundary becomes materially weaker. If not, trigger A01.
+Standalone-worthiness test:
 
-Test B — standalone-worthiness test:
-If deletion loses a small but necessary proposition, ask whether that proposition is only a definition, bridge, or reference-establishment statement that the adjacent sentence immediately operationalizes. If the full unique content can be absorbed into the adjacent sentence as a short modifier/clause without loss of argument structure, trigger A01 as a merge-only candidate.
+- one narrow proposition immediately consumed by the next/previous sentence -> MERGE-ONLY;
+- two or more independent substantive propositions -> normally KEEP unless another rule triggers.
 
-Do NOT trigger A01 merely because a sentence is grammatically mergeable. A sentence carrying two or more independent constraints, assumptions, result dimensions, or access conditions normally has enough unique information to stand alone even if it could be combined stylistically. Likewise, a method-introduction sentence that names the proposed method AND states its core principle may perform the G -> M transition and should not be flagged solely for mergeability.
+Hard pattern: generic opening definitions are not automatically useful. If the next paper-specific problem remains fully intelligible after repaired deletion, delete/merge the generic definition.
 
-Do not treat anaphoric dependence as evidence of information value. If a later sentence says "this reference", "this setting", "this score", or similar, mentally replace the pronoun with its antecedent before testing deletion.
+Exception: keep a generic-looking sentence only when it supplies the unique concrete causal antecedent used by the next claim.
 
-Apply a generic-background test to opening sentences. A textbook-style definition of the field, threat, or task is not automatically necessary. If the following paper-specific problem remains fully understandable after deleting the definition, trigger A01.
+Hard merge pattern: if a sentence only defines a reference object or generic state that the next sentence immediately consumes (for example, `trusted samples establish normal behavior` followed by a method measuring deviation from `this reference`), rerun the deletion test after replacing the anaphor with the concrete noun phrase. If the scientific proposition is preserved, mark the first sentence MERGE-ONLY or DELETE-CANDIDATE rather than keeping it merely as an antecedent supplier.
 
-HARD PATTERN A01-GENERIC-DEFINITION:
-If an opening sentence mainly defines a standard threat/task behavior and the next sentence states the paper-specific difficulty, perform repaired deletion as the default. If replacing an anaphor such as "such samples/this attack" with the concrete noun leaves the paper-specific problem fully intelligible, classify the definition as DELETE-CANDIDATE unless one of the exceptions below applies. Do not preserve it merely because it is useful background.
+Output: KEEP / MERGE-ONLY / DELETE-CANDIDATE and the exact unique proposition count.
 
-CAUSAL-ANTECEDENT EXCEPTION:
-KEEP the otherwise generic-looking sentence when it supplies the only concrete behavioral premise that the immediately following problem/risk sentence actually reasons from. This exception requires logical dependence, not mere referential dependence.
+## A02 — Motivation built on a weak conditional scenario
 
-Use this test:
-1. Rewrite/remove simple anaphora first.
-2. Delete the candidate sentence.
-3. Ask whether the next problem/risk claim still has its concrete causal antecedent, rather than merely still having a named entity to refer to.
-4. If the next claim explicitly summarizes or reasons from a specific behavior/property introduced only in the candidate sentence, KEEP it as a causal antecedent and review the next bridge under A03.
-5. If the next sentence remains a complete paper-specific problem using only the noun identity (e.g. replacing "such samples" with "poisoned samples"), the exception does not apply and the generic definition remains a DELETE-CANDIDATE.
+Trigger when the paper's main motivation is built from multiple hedged assumptions such as may/might/often/could plus "under this setting" rather than an objective technical or deployment chain.
 
-Examples of the distinction:
-- Referential-only dependency: "Backdoors do X... Such samples are hard to cleanse because their loss/features are not stable anomalies." If the cleansing difficulty remains intact after replacing "such samples" with "poisoned samples", the definition is deletable.
-- Causal dependency: "A backdoored model behaves normally on clean inputs but changes under a hidden trigger. [Next sentence] This trigger-dependent behavior creates deployment risk." The behavior sentence supplies the concrete premise consumed by the risk claim; keep it, while separately testing whether the risk bridge is logically explicit under A03.
+Distinguish:
 
-To invoke the exception, quote the exact downstream phrase that consumes the candidate sentence's specific behavior/property. A pronoun alone is insufficient.
-
-HARD PATTERN A01-REFERENCE-ESTABLISHMENT:
-If a sentence's sole substantive proposition is of the form "trusted/clean/reference samples establish/define normal behavior, a reference, or a baseline" and the immediately adjacent sentence operationalizes that same reference by measuring deviation, distance, risk, or comparison against it, classify the standalone sentence as MERGE-ONLY. Exception: KEEP only if the reference-establishment sentence contains an independent construction method, constraint, quantitative setting, or contribution that cannot be preserved as a short clause in the operational sentence.
-
-These hard patterns take priority over a vague judgment that a sentence is "helpful context" or "a necessary premise." The reviewer must cite the exception if overriding a hard pattern.
-
-For stability, explicitly count unique propositions in each candidate sentence:
-- 0 unique propositions after repaired deletion -> delete candidate.
-- 1 narrow proposition that is immediately consumed/operationalized by an adjacent sentence -> merge-only candidate.
-- 2+ independent substantive propositions -> normally not A01; evaluate under other rules instead.
-
-Review questions:
-1. After repaired deletion, exactly which unique proposition disappears?
-2. Is that proposition paper-specific and necessary, or generic/background knowledge?
-3. Is it immediately operationalized by the next/previous sentence so that a short clause preserves everything?
-4. How many independent substantive propositions does the sentence carry?
-5. Does the sentence perform a genuine discourse transition or impose independent constraints that justify a standalone sentence?
-
-Output:
-Classify each sentence as KEEP / MERGE-ONLY / DELETE-CANDIDATE. For MERGE-ONLY or DELETE-CANDIDATE, state the exact unique proposition and why it does not justify a standalone sentence.
-
-### A02 — Motivation built on a weak conditional scenario
-
-Trigger:
-Words such as may, might, could, often, potentially, possibly, or "under this setting" are used to carry the main research motivation.
-
-Do not flag uncertainty mechanically. Distinguish uncertainty about an observation from uncertainty that defines the entire reason the paper is needed.
-
-HARD PATTERN A02-COMPOUND-HYPOTHETICAL-SETTING:
-Trigger A02 when the abstract builds the method's motivating setting from two or more hedged existence/prevalence/resource assumptions (for example "models may contain X", "deployers often have only Y", "users may lack Z") and then immediately proposes the method "under this setting" or equivalent wording, without first establishing an objective deployment/technical chain that exists independently of how often those assumptions happen.
-
-The concern is not the individual words may/often. The concern is this structure:
-hedged condition A + hedged condition B (+ condition C) -> "under this setting" -> we propose the method.
-This makes the method appear useful only if the author's chosen scenario happens to hold.
-
-A02 should NOT trigger merely because a technical property is uncertain across samples/attacks, such as "poisoned samples may not form stable anomalies", when the sentence describes a concrete failure mode of an already established task. It also should not trigger when the abstract first states an objective deployment constraint, such as "the released artifact does not reveal the training process", and uses uncertainty only to describe attack behavior within that objective constraint.
-
-For every motivating hedge, label it as one of:
-- EXISTENCE/PREVALENCE assumption;
-- RESOURCE/ACCESS assumption;
-- TECHNICAL VARIABILITY statement;
+- existence/prevalence assumption;
+- resource/access assumption;
+- technical variability;
 - ordinary epistemic caution.
 
-Review questions:
-1. If the hedged prevalence/existence claims are removed, does an objective problem still remain?
-2. Is "under this setting" merely naming a scenario assembled by the authors, or does it follow from an externally grounded deployment constraint?
-3. Are multiple hedges jointly carrying the P/G transition?
-4. Can the motivation be rewritten as an objective chain such as deployment condition -> audit/technical limitation -> security/engineering consequence -> need for the method?
+Do not mechanically flag uncertainty about attack/sample variability.
 
-Output:
-When triggered, show the current conditional chain and the missing objective chain. Do not suggest simply deleting may/often; explain what objective deployment or technical premise must replace them.
+Output the current conditional chain and the objective chain that should replace it.
 
-### A03 — Logical connector or abstract-summary bridge without sufficient logic
+## A03 — Logical connector or summary bridge without sufficient logic
 
-Trigger:
-Because, therefore, thus, hence, consequently, or equivalent expressions connect two statements that do not follow directly OR appear to follow only after the author compresses prior concrete statements into newly introduced abstract labels.
+Trigger on because/therefore/thus/hence/consequently or equivalent summary moves when Q does not follow locally from P.
 
-A connector can be formally plausible and still fail this rule. Pay special attention when the antecedent contains newly coined summary nouns or nominalized labels such as "opaque provenance", "trigger-dependent behavior", "representation abnormality", "security concern", or similar abstractions that were not established as terms beforehand. The reviewer must test whether these labels clarify the causal mechanism or merely force the reader to decode earlier sentences again.
+Hard patterns:
 
-HARD PATTERN A03-RENAMING-BRIDGE:
-If a sentence (i) introduces one or more new abstract/nominalized labels that merely rename facts stated in the immediately preceding sentence(s), and (ii) uses therefore/thus/hence/consequently or an equivalent summary move to derive a problem/risk/conclusion, trigger A03 unless the new labels add an explicit causal mechanism that was absent before. Logical plausibility is not enough. The issue is that "concrete facts -> new labels -> conclusion" forces the reader to decode the labels before seeing the causal relation.
+1. A sentence that invents abstract labels for preceding concrete facts and then uses those labels to derive a conclusion is weak unless the labels add a real causal mechanism.
+2. ABSTRACT-GAP SEQUENCING: if an Abstract moves from a broad task/privacy/utility statement directly to `existing methods do X, which causes Y`, test whether the preceding text has actually established why X is technically inadequate for the synthesis objective. If the key consistency criterion, reconstruction difficulty, or other missing premise appears only after the prior-work limitation, flag the bridge rather than treating adjacency as explanation.
+3. RENAMED-RISK BRIDGE: changing concrete facts into labels such as `opaque provenance`, `trigger-dependent behavior`, `heterogeneity`, or `complexity` and then writing `therefore this creates a risk/need` does not by itself supply a mechanism. Trigger when the conclusion depends on the relabeling rather than an explicit consequence chain.
+4. RULE-INDEPENDENCE GUARD: run A03 independently of X02. If an Abstract first states a broad requirement in a conceptually flawed or conflated way and then immediately presents `existing methods do X, which causes Y`, still test whether the missing technical criterion linking X to Y was established. An X02 finding in the earlier sentence does not resolve or suppress a separate A03 sequencing gap.
 
-To override this hard trigger, quote the exact words in the new labels/sentence that add a mechanism rather than simply summarize prior facts. If no such words can be quoted, A03 is triggered.
+Represent as:
 
-Review questions:
-1. Can a first-time reader derive Q from the concrete preceding facts without supplying an unstated premise R?
-2. Does the connector rely on newly introduced abstract nouns that rename previous facts rather than state the causal mechanism directly?
-3. If those abstract labels are expanded back into the preceding concrete facts, is the causal relation still explicit and economical?
+P -> [missing premise] -> Q
 
-Output:
-For a missing premise, show P -> [missing premise] -> Q. For an abstract-summary bridge, show "concrete facts -> newly coined labels -> connector -> conclusion" and explain whether the labels should be removed in favor of a direct causal sentence.
+or:
 
-### A04 — Problem-solution mapping failure
+concrete facts -> renamed labels -> connector -> conclusion
 
-Trigger:
-The abstract states one or more technical problems/gaps and later introduces major designs, but the correspondence is not EXPLICITLY TRACEABLE in the abstract text.
+## A04 — Problem-solution mapping failure
 
-Passing A04 requires more than "a knowledgeable reader can infer the relationship." For every major Problem -> Design pair, the reviewer must be able to cite textual evidence from the abstract that establishes BOTH:
-1. the target difficulty/deficiency; and
-2. why this design addresses that specific difficulty.
+For every major problem/gap P_i and every major design D_j, build:
 
-Build this matrix:
+| Problem/gap | Design | Exact bridge text | Mechanistic reason | Status |
 
-Problem/gap | Design | Exact bridge text | Mechanistic reason stated in abstract | Status
+Status:
 
-Status rules:
-- Explicit: the abstract itself states or locally signals the correspondence and mechanism.
-- Inferable-only: the pairing is plausible from domain knowledge or distant context, but no local bridge/mechanistic reason is stated. Trigger A04.
-- Ambiguous: more than one problem/design pairing is possible. Trigger A04 strongly.
-- Unmapped: a major problem or design has no counterpart. Trigger A04 strongly.
+- Explicit;
+- Inferable-only;
+- Ambiguous;
+- Unmapped.
 
-When multiple problems and multiple designs exist, do not pass the mapping merely because a one-to-one assignment can be guessed after reading the whole abstract. The intended pairing must be recognizable without reverse engineering the method.
+A knowledgeable reader being able to guess the mapping is not enough. Inferable-only, ambiguous, and unmapped are findings.
 
-Output:
-For every non-Explicit pair, quote the problem text and design text, state what bridge is missing, and give a revision criterion that would make the mapping explicit.
+## A05 — Concept overload
 
-### A05 — Concept overload
+Trigger when several new modules/components are named before the reader understands the core causal mechanism.
 
-Trigger:
-Several new method concepts are introduced in a short span, especially if the reader must remember many unfamiliar modules before understanding the main mechanism.
+Prefer:
 
-Review question:
-Can the method be explained first as one causal mechanism before naming implementation components?
+problem -> mechanism -> major design names
 
-Output:
-Identify which concepts are core and which can be delayed, merged, or removed from the abstract.
+over a dense inventory of component names.
 
-### A06 — Procedure listing instead of mechanism explanation
+## A06 — Procedure listing instead of mechanism explanation
 
-Trigger:
-The method paragraph is dominated by "first / then / next / finally" style sequencing.
+Trigger when method prose is dominated by first/then/next/finally and explains order without purpose.
 
-Review question:
-Does each step explain why it exists and what problem it solves, or only what happens next?
+Rewrite logic as:
 
-Output:
-Rewrite the method logic as purpose -> operation -> consequence.
+purpose -> operation -> consequence.
 
-### A07 — Orphan or locally unmotivated method component
+## A07 — Orphan or locally unmotivated method component
 
-Trigger:
-A module name or technical component appears before the abstract provides an EXPLICIT LOCAL BRIDGE explaining why it is needed and how it connects to the current mechanism.
+For every new component:
 
-The standard is stricter than semantic inferability. A reader being able to guess a component's purpose from domain knowledge, from a problem stated several sentences earlier, or from the component's name is NOT enough. Each major component should be locally anchored by wording that makes its target and role visible at first reading.
+| Component | Nearest need | Exact local bridge | Output/signal | Status |
 
-For every new component, build a component ledger:
-Component | Nearest preceding problem/need | Exact local bridge text | Output/signal it contributes | Status
+Status:
 
-Status rules:
-- Explicitly motivated: a nearby clause/sentence states the specific need, links the component to that need, AND gives enough mechanism to explain why this component is an appropriate response.
-- Role-only bridge: the sentence only says what evidence the component "captures/measures/probes" (for example local evidence or high-frequency evidence) but does not connect that evidence type to the previously stated difficulty or explain why this view is needed. Trigger A07. A role label is not a rationale.
-- Distant-only: a relevant problem exists earlier, but the component appears without a local bridge. Trigger A07.
-- Name-inferable: the purpose is guessed mainly from the component name (e.g. spatial occlusion sounds local, high-frequency suppression sounds frequency-related). Trigger A07 strongly.
-- Pipeline-orphaned: the component's output is not connected to what came before/after. Trigger A07 strongly.
+- explicitly motivated;
+- role-only;
+- distant-only;
+- name-inferable;
+- pipeline-orphaned.
 
-HARD PATTERN A07-BRANCH-INTRODUCTION:
-When a generic operation such as "controlled perturbations" or "multi-view evidence" is followed by named branches/modules, each branch must be introduced with an explicit reason tied to a stated difficulty. "Branch A captures local evidence, whereas Branch B captures non-local evidence" is insufficient by itself if the abstract has not locally said why both evidence types are needed for the stated trigger/problem heterogeneity. In that case classify both branches as ROLE-ONLY or DISTANT-ONLY, not Explicitly motivated.
+A component name that sounds self-explanatory does not count as motivation.
 
-Review questions:
-1. What exact prior words establish the specific need for this component?
-2. What exact nearby words say that this component addresses that need?
-3. Could a first-time reader identify the pairing without using domain knowledge or reverse engineering later sentences?
-4. Is the component's output/significance connected to the next pipeline step?
-5. If the component were renamed to a neutral label (Module A), would its role still be obvious from the abstract? If not, the prose is relying on the name to carry logic.
+## A08 — Subjective, vague-comparative, or unsupported evaluation
 
-Output:
-Mark non-explicit components as "locally unmotivated" and quote the missing bridge. Do not clear A07 merely because a plausible mapping exists somewhere in the abstract.
+Trigger on author-side labels such as effective, robust, superior, competitive, promising, significant, interpretable, reliable, or "more sensitive" when comparator, measured quantity, and scope are not explicit.
 
-### A08 — Subjective, vague-comparative, or unsupported evaluation
+Prefer measured evidence to value labels.
 
-Trigger:
-Words such as effective, efficient, robust, superior, promising, interpretable, significant, sensitive, reliable, or comparative forms such as "more sensitive" are used as author evaluation rather than as a precisely defined measured finding.
+If the manuscript already contains quantitative evidence, recommend the concrete number(s) or bounded comparison instead of "competitive", "effective", or similar language.
 
-Do not ban these words mechanically, but do not let later experiments retroactively make a vague label precise. A comparative/evaluative phrase in the abstract must have an identifiable comparator, measured quantity, and scope. "More sensitive" must answer: more sensitive than what, to what signal, and by what observable criterion? "Interpretable" must identify what is interpretable and what evidence or mechanism makes that interpretation traceable.
+## A09 — Opaque experimental scope
 
-Review questions:
-1. Is the phrase a measured finding or an author-side label?
-2. For a comparative adjective, are comparator + metric/observable + evaluation scope explicit?
-3. Can the phrase be replaced by the concrete ablation, comparison, or controlled result already present in the manuscript without losing information?
-4. Does the evidence establish the named property itself, or only a downstream performance change from which the property is being inferred?
+Trigger on "multiple datasets", "various settings", "extensive experiments", "N settings", etc. when the composition is unclear.
 
-Output:
-Prefer evidence over labels. If comparator/metric/property is undefined, flag the wording even when a related ablation exists; recommend stating the observable effect instead.
+Prefer quantity + composition when supported, e.g. number of datasets, attacks, models, parameter grid, or repetitions.
 
-### A09 — Opaque experimental scope
+## A10 — Claim-evidence mismatch
 
-Trigger:
-The abstract reports "N settings", "multiple datasets", "various models", "extensive experiments", or similar scope descriptions without enough composition information.
+Trigger when the Abstract advertises a property that the paper does not directly establish, such as:
 
-Review question:
-Would a first-time reader know what the experimental count is made of?
+- lightweight;
+- scalable;
+- robust;
+- generalizable;
+- low-cost;
+- data-efficient;
+- small / limited / few trusted samples;
+- few-shot.
 
-Output:
-Prefer quantity + composition, e.g. dataset count x attack count x model count when supported by the paper.
+Hard distinction for resource phrases such as `small trusted set`, `limited trusted clean data`, or `few trusted samples`:
 
-### A10 — Claim-evidence mismatch
+1. If the phrase merely states an operating condition — for example, the defender has a fixed trusted set of a stated size — treat it as a neutral assumption and do not infer data efficiency.
+2. If the wording presents scarcity itself as an advantage — for example, `only a small set is required`, `works with limited data`, or `suitable for low-resource deployment` — require direct supporting evidence such as trusted-set-size sensitivity, sample-efficiency analysis, or another bounded experiment.
+3. Using one fixed trusted-set size does not by itself establish that the method is data-efficient or that the set is objectively `small`.
+4. A later limitation that says the method `requires a limited number of trusted samples` does not retroactively validate an Abstract capability claim.
+5. NEUTRAL-PREPOSITIONAL CONDITION: wording of the form `a framework ... with a small/limited trusted set` is a neutral operating condition when it merely names what data the defender has. In that form, and without scarcity-as-advantage markers such as `only`, `requires just`, `works with limited data`, `data-efficient`, or `suitable for low-resource deployment`, mark A10 checked-no-trigger rather than uncertain. Do not demand a trusted-set sensitivity study merely to justify the existence of that operating condition.
 
-Trigger:
-The abstract presents a property as a key strength, such as small trusted set, lightweight, low-cost, scalable, robust, generalizable, few-shot, or data-efficient.
+Recommend weakening/removing the property, rewriting it as a neutral operating assumption, or adding direct evidence.
 
-Review question:
-Does the method or experiment explicitly establish this property?
+## 5.2 Abstract mandatory execution
 
-Output:
-If not, mark the wording as an unsupported selling point and recommend weakening, removing, or adding evidence.
-
-## 5.1 Mandatory exhaustive execution protocol
-
-The issue taxonomy is not a menu. Execute every applicable check systematically. Use a TWO-PASS process so that detection is separated from adjudication.
-
-### Pass 1 — high-recall candidate ledger
-
-Number the abstract sentences S1...Sn and create internal ledgers before deciding which issues are severe.
-
-Sentence ledger:
-- Run A01 on every sentence and classify KEEP / MERGE-ONLY / DELETE-CANDIDATE with unique-proposition count.
-- Run A03 on every explicit connector and every abstract-summary bridge.
-- Record every capability/advantage/evaluative phrase for A08/A10.
-
-Problem-design ledger:
-- Extract every stated problem/gap P1...Pk.
-- Extract every major design/component D1...Dm.
-- For each plausible P-D pair, quote the exact bridge text. If there is no bridge text, mark INFERABLE-ONLY rather than silently passing it.
-
-Component ledger:
-- For every D1...Dm, quote the nearest preceding need and the local bridge that motivates it.
-- If purpose is understood mainly from the component name or domain knowledge, mark NAME-INFERABLE or DISTANT-ONLY.
-
-Experiment ledger:
-- Record each experiment-scope phrase for A09 and decompose counts where the manuscript supports it.
-- Record each headline property/advantage for A10 and locate direct evidence in the manuscript.
-
-### Pass 2 — conservative adjudication
-
-Before free-form judgment, apply all HARD PATTERN rules. A hard-pattern match is the default decision. It may be overridden only when the reviewer quotes the exact exception evidence required by that hard rule. This priority is intended to reduce run-to-run drift on borderline sentences.
-
-Convert ledger entries into findings using these rules:
-- Missing explicit bridge is not a clean pass. It is at least a possible concern; if multiple problems/designs are present or the module appears abruptly, elevate to a strong hit.
-- Do not promote a sentence to A01 merely because it can be combined grammatically; require the A01 unique-information criteria.
-- Do not downgrade a vague evaluative phrase merely because related experiments exist; the named property itself must be defined and evidenced.
-- Distinguish "text explicitly establishes X" from "X can be inferred by an expert." The latter is weaker and should be reported when this reviewer style emphasizes not making readers infer logic.
-
-### Coverage requirements
+Pass 1 — high-recall ledgers:
 
 - A01: every sentence.
-- A02: the motivation block.
-- A03: every causal/summary bridge.
-- A04: every major problem/gap against every major design.
-- A05/A06: the complete method narrative.
-- A07: every newly introduced component.
+- A02: full motivation block.
+- A03: every explicit connector and summary bridge.
+- A04: every problem against every major design.
+- A05/A06: complete method narrative.
+- A07: every new component.
 - A08: every evaluative/comparative phrase.
 - A09: every experiment-scope expression.
-- A10: every headline capability/advantage claim.
+- A10: every headline advantage.
+- X01: every nontrivial anaphoric reference.
+- X02: every task/protection/utility/gap/mechanism causal statement.
 
-Do not terminate because several severe findings have already been identified. The final coverage matrix must state Triggered / Checked-no-trigger / Uncertain for every A01-A10 rule and cite the exact sentence(s) checked. For every Checked-no-trigger decision under A04 or A07, include the exact bridge text that justifies the pass; if no such text can be quoted, it cannot be Checked-no-trigger.
+Pass 2 — conservative adjudication:
 
+- distinguish explicit text from expert inference;
+- do not clear A04/A07 without exact bridge text;
+- do not clear A08 merely because related experiments exist;
+- do not turn a purely stylistic preference into a logic finding.
 
-## 6. Introduction module v0.5
+Final Abstract coverage must state Triggered / Checked-no-trigger / Uncertain for A01-A10 and X01-X02.
 
-### 1. Purpose
-This module reviews an academic paper's Introduction as an argument that should expand beyond the abstract, narrow from the broad research problem to the paper's specific gap, and make paragraph-to-paragraph logic explicit.
+---
 
-The Introduction is not treated as a longer abstract. It should perform additional rhetorical work: establish broader context, position the work in the defense/method landscape, derive a specific technical gap, motivate the chosen method family, and connect that gap to the paper's contributions.
+# 6. Introduction module
 
-### 2. Core Introduction Structure
-Reconstruct the Introduction as:
-**Context / real-world problem → broad research landscape → target subproblem or method family → concrete limitation → research gap → proposed approach → contributions / evidence preview**
-The reviewer must inspect both the nodes and the transitions between them.
+## 6.1 Core structure
 
-### 3. Rules
-#### I01 — Abstract–Introduction role duplication
-Trigger: The first Introduction paragraph substantially replays the abstract's opening problem/motivation chain instead of changing the paragraph-level rhetorical function.
+Reconstruct:
 
-Hard overlap-ratio test:
-1. Split Introduction P1 into independent substantive propositions. For each proposition, label it SAME (already present in the abstract with the same argumentative role), MIXED (partly repeats but adds a substantive new premise/mechanism/context), or NEW.
-2. Compute a qualitative weighted overlap ratio R = (SAME + 0.5 × MIXED) / total propositions. Show the counts so the decision is auditable.
-3. Trigger I01 when R is approximately 0.70 or higher AND at least three repeated/mixed propositions reproduce the abstract's problem chain in the same order. A near-verbatim chain covering most of P1 is a strong trigger.
-4. If R is between about 0.50 and 0.70, report high overlap but do not hard-trigger I01 unless the genuinely new material is only an appended consequence/example and does not create a distinct paragraph-level role.
-5. Substantive deployment/supply-chain context, historical or threat evolution, literature positioning, mechanism explanation, or a narrower research gap counts as NEW only when it introduces independent propositions—not merely new nouns attached to an old proposition. Two or more such independent new propositions can change the dominant role and prevent I01 even when some attack/background facts repeat.
-6. One appended consequence, citation, qualification, or example cannot by itself rescue a paragraph whose preceding chain is overwhelmingly the abstract rewritten.
+Context / real-world problem
+-> broad research or solution landscape
+-> selected subproblem / method family
+-> concrete limitation
+-> research gap
+-> proposed approach
+-> contributions / evidence preview
 
-Compression test: compress all SAME propositions to one bridge sentence. If a coherent, substantial paragraph remains that performs a genuinely new role, do not trigger I01. If almost nothing remains except one minor consequence, trigger I01.
+## I01 — Abstract-Introduction role duplication
 
-Output: show Abstract A_i → Introduction I_j mappings, SAME/MIXED/NEW counts, approximate R, and the compression-test result.
+Compare Abstract motivation/problem propositions with Introduction paragraph 1.
 
-#### I02 — Premature narrowing / broken broad-to-narrow funnel
-Trigger: The Introduction is still discussing a broad research problem but jumps directly to one particular defense family, method, or implementation choice before positioning that choice within the broader landscape.
-Expected funnel: Broad problem → major solution/defense families → chosen subarea → limitations of that subarea → paper gap → proposed method.
-The Introduction does not need an exhaustive literature survey, but it must give enough landscape context that the selected subproblem does not look arbitrary or based on a single method.
-Hard test: For each paragraph, label scope L0 domain/application; L1 threat/broad problem; L2 broad solution/defense landscape; L3 selected method family/subproblem; L4 specific technical limitation; L5 this paper's solution.
-If narrative jumps from L1 directly to L3/L4 with wording such as “one practical defense is …” without establishing L2, trigger I02 unless scope was already explicitly restricted and justified.
-Output: show current scope sequence and missing layer, e.g. Backdoor risk (L1) → [missing defense landscape, L2] → detection-guided purification (L3).
+Label each Introduction P1 proposition SAME / MIXED / NEW.
 
-#### I03 — Paragraph-edge logical discontinuity
-Trigger: A new paragraph introduces a new problem, mechanism, variable, or technical limitation whose reason for appearing now is not established by the previous paragraph. Mere topic-word overlap is not enough.
+Compute approximate weighted overlap:
 
-Hard paragraph-edge test for every P_i → P_{i+1}:
-1. Write the final substantive proposition of P_i as X and the first substantive proposition of P_{i+1} as Y.
-2. Classify the edge as one of: EXPLICIT-CAUSAL (X directly motivates Y), EXPLICIT-SCOPE (Y explicitly narrows/extends the object established by X), TOPIC-ONLY (same general topic/terms but the new limitation is not derived), or UNSTATED.
-3. Ask: “Why does Y follow now?” If answering requires an additional proposition R that is not locally stated, trigger I03 for TOPIC-ONLY or UNSTATED edges.
-4. Transition words such as when, however, therefore, we consider, or repeated terms such as detection/purification do not by themselves establish the bridge. Test the semantic relation, not lexical continuity.
-5. Hard pattern — SETTING-TO-LIMITATION JUMP: if P_i mainly defines resources, access assumptions, data, or operating setting, while P_{i+1} suddenly introduces a failure of a particular internal decision/interface/algorithmic convention, trigger I03 unless the text explicitly says that the selected pipeline uses that convention or explains why the setting leads to that limitation.
-6. SELECTED-METHOD LIMITATION EXCEPTION: do not trigger I03 merely because the next paragraph narrows from an explicitly named method/subarea to a limitation of that same method's plainly identifiable parameter, threshold, component, or operating choice. Examples: “trajectory smoothing” → “fixed smoothing thresholds”; “control filtering” → “fixed filtering thresholds.” This is EXPLICIT-SCOPE when the referent is unambiguous. This exception does NOT apply when the prior paragraph only states a broad setting/resource (“risk calibration and purification”) and the next paragraph introduces a previously unstated internal interface convention (“only a binary decision is passed to the update stage”).
-7. I02/I03 NON-DUPLICATION: scope-layer omissions belong to I02, not I03. If P_{i+1} is explicitly framed as a solution/defense/approach that responds to the broad problem in P_i (for example, “One practical solution/defense is …”), and the only missing material is the L2 solution landscape or justification for selecting that family, classify the paragraph edge itself as EXPLICIT-CAUSAL and trigger I02 only. Trigger I03 as well only if there is an additional semantic gap beyond the missing landscape.
-8. Do not trigger when P_i ends by stating a need/constraint and P_{i+1} directly supplies the mechanism or observation that addresses that exact need.
+R = (SAME + 0.5 * MIXED) / total propositions.
 
-Represent a failure as X → [missing bridge R] → Y.
-Output: quote X and Y, give the edge class, state the missing R when triggered, and say where the bridge should be inserted.
+Trigger I01 when:
 
-### 4. Mandatory Introduction Ledger
-Before free-form comments, create:
-| Paragraph | Main function | Scope level | New information beyond abstract | Link from previous paragraph | Status |
-|---|---|---|---|---|---|
-Also create cross-section overlap ledger:
-| Abstract proposition | Introduction proposition | Same function or new function? | I01 status |
-|---|---|---|---|
+- R is about 0.70 or higher; and
+- at least three SAME/MIXED propositions replay the Abstract's chain in substantially the same order.
 
-### 5. Review Order
-1. Compare abstract motivation/problem block with first Introduction paragraph (I01).
-2. Reconstruct Introduction broad-to-narrow scope ladder (I02).
-3. Test every paragraph boundary for “why now?” continuity (I03).
-4. Only after structural checks, review local language and citation wording.
+Compact-opening exception: when the supplied Abstract/Introduction comparison contains only a short opening block, trigger I01 with two strongly equivalent propositions if they cover essentially the whole supplied opening, preserve the same order, and add little or no NEW rhetorical work. Do not use this exception when the Introduction adds a distinct deployment perspective, task definition, causal mechanism, or other independent proposition.
 
-### 6. Blind Regression Mode
-When blind testing this module, do not expose professor/supervisor annotations to the reviewer. Supply only annotation-free manuscript text. The evaluator may compare the output with withheld annotations after the run.
+Compression test:
 
-## 7. Professor-comment interpretation protocol
+Compress all repeated propositions to one bridge sentence. If little substantial new rhetorical work remains, trigger I01.
 
-For every professor comment, produce five layers:
+Do not treat a new citation, example, or noun as new rhetorical work unless it adds an independent proposition.
 
-1. Comment target: exact sentence/phrase and location.
+## I02 — Premature narrowing / broken broad-to-narrow funnel
+
+Label paragraph scope:
+
+- L0 domain/application;
+- L1 threat/broad problem;
+- L2 broad solution/research landscape;
+- L3 selected family/subproblem;
+- L4 specific limitation;
+- L5 this paper's solution.
+
+Trigger when the Introduction jumps from L1 to L3/L4 without enough L2 positioning, unless the scope restriction is explicitly justified.
+
+Hard funnel pattern: `broad threat/risk -> one practical defense is [specific family]` is an L1 -> L3 jump when no broader defense landscape or explicit scope-selection rationale appears between them. Local coherence is not sufficient: the reader must also understand where the chosen family sits among the plausible defense directions. A sentence that first names the broader landscape and then narrows to the selected family is a negative control.
+
+## I03 — Paragraph-edge logical discontinuity
+
+For every P_i -> P_{i+1}:
+
+1. Let X = final substantive proposition of P_i.
+2. Let Y = first substantive proposition of P_{i+1}.
+3. Classify edge:
+   - EXPLICIT-CAUSAL;
+   - EXPLICIT-SCOPE;
+   - TOPIC-ONLY;
+   - UNSTATED.
+4. Ask: "Why does Y follow now?"
+
+If the answer requires missing R, trigger I03:
+
+X -> [missing R] -> Y
+
+Transition words and repeated topic nouns do not by themselves establish the bridge.
+
+Hard setting-to-limitation pattern: a paragraph that only defines defender access, trusted data, or the deployment setting does not by itself motivate a specific limitation of a downstream interface such as binary suspicious/non-suspicious decisions. Before introducing that limitation, the text should establish the missing interface premise — for example, that suspicious-sample detection is the mechanism connecting the trusted reference to model updating and that its output is what purification receives. Without that bridge, trigger I03 even when both paragraphs concern the same defense setting.
+
+## I04 — Challenge-to-contribution closure
+
+Trigger when the Introduction explicitly states numbered/parallel challenges, gaps, or research questions and later lists contributions, but the contribution list does not visibly close those challenges.
+
+Build:
+
+| Challenge/gap | Contribution(s) responding to it | Exact response wording | Status |
+
+Status:
+
+- closed explicitly;
+- partial;
+- many-to-one but explicit;
+- contribution-only;
+- challenge-only;
+- inferable-only.
+
+A contribution list is not a separate inventory. It should make the reader see how the paper answers the challenges already raised.
+
+If there are two challenges and four contributions, do not require a 2x2 numerical match; require explicit logical grouping/closure.
+
+## I05 — Task-setting placement and self-introduction timing
+
+Trigger when the Introduction's target task/defense setting/objective is explained too late, or when an extra "This paper focuses on..." paragraph interrupts a chain that has already narrowed to the concrete gap.
+
+Expected order:
+
+target setting/objective established early enough
+-> relevant limitations derived
+-> concrete gap
+-> proposed work introduced directly
+
+Two hard patterns:
+
+1. LATE-TASK-DEFINITION:
+   the manuscript discusses limitations of a task before clearly defining that task's operational objective or defender capability.
+
+2. GAP-THEN-BACKTRACK:
+   the text has already established a specific gap, then backs up to re-explain the general task/setting instead of introducing the proposed approach.
+
+3. LIMITATION-THEN-TASK-RESET:
+   the text has already stated a concrete observation or limitation (for example, one static view cannot characterize diverse triggers) and then inserts `This paper focuses on [task]` plus a generic task objective. If that task definition is a prerequisite for interpreting the limitation, move it earlier; if it is not, introduce the proposed work directly instead of resetting the funnel.
+
+Output the current order and the corrected rhetorical order.
+
+## 6.2 Mandatory Introduction ledger
+
+Create:
+
+| Paragraph | Main function | Scope level | New beyond Abstract | Link from previous | Status |
+
+If Abstract is available, also create:
+
+| Abstract proposition | Introduction proposition | SAME/MIXED/NEW | I01 status |
+
+Run:
+
+- I01 on P1 when evaluable;
+- I02 on the complete scope ladder;
+- I03 on every paragraph edge;
+- I04 on every explicit challenge/gap list vs contribution list;
+- I05 on task-setting and self-introduction placement;
+- X01-X02 throughout.
+
+---
+
+# 7. Related Work module
+
+Related Work should position the literature and derive the research gap objectively. It is not the Method section and should not become a second Introduction.
+
+## R01 — Taxonomy, title, and coverage consistency
+
+Trigger when a subsection introduces a taxonomy (for example four defense categories) but:
+
+- develops only one category without explaining the narrowing;
+- the subsection title names one category while the paragraph claims to cover several;
+- categories are mixed at different abstraction levels;
+- terminology such as attack, defense, detection, mitigation, cleansing, repair, and intervention is used without clear parent-child or sibling relationships.
+
+Taxonomy ledger:
+
+| Category/term | Parent concept | Sibling concepts | Actually covered? | Title compatible? |
+
+If the taxonomy says "four categories", either cover the four categories proportionally, split them, or explicitly state why the subsection narrows.
+
+## R02 — Objective literature voice / premature "our method" positioning
+
+Trigger when Related Work repeatedly says "our method", "our evaluation", "our framework", or explains the proposed method while still surveying prior work.
+
+Preferred pattern:
+
+prior work -> capability -> limitation/gap
+
+Then, at the end of a subsection or the Related Work section, a short positioning sentence may explain how the current paper differs.
+
+Hard rules:
+
+1. Do not use the paper's own mechanism as the main evidence that prior work is limited.
+2. A single concise current-paper positioning sentence is allowed after the paragraph or subsection has objectively established the prior-work behavior/capability and the comparison axis. It need not first prove a deficiency if the sentence merely states a high-level difference and does not infer that prior work is inadequate. Trigger R02 when the current-method sentence itself supplies an unstated limitation, requirement, or negative inference about prior methods, even if `our` appears only once.
+3. When the same sentence also gives scoring operators, branch behavior, fusion logic, or other internal mechanics, R04 may co-trigger; R02 remains the primary voice/positioning issue when the objective gap has not yet been established.
+4. EVALUATION-DESIGN LEAKAGE: a Related Work sentence such as `this motivates our evaluation`, `we evaluate under`, or `our experiments cover` normally shifts from literature synthesis into the current paper's experimental design. Flag R02 unless the sentence is necessary to state a high-level comparison boundary and does not enumerate the paper's scenarios, attacks, datasets, metrics, or evaluation protocol. Move detailed evaluation justification to the experimental setup.
+5. SELF-CONTRAST-AS-GAP: a pattern such as `Prior methods do X. Our method does not require Y; instead it does Z` is not an objective literature gap when the prior sentence has not established that Y is actually an assumption or limitation of those methods. Trigger R02 even when the current-method sentence is concise; concision does not convert an author-supplied contrast into literature evidence.
+
+## R03 — Literature-transition and term-relation discontinuity
+
+For each paragraph/subsection edge, apply a Related-Work "why now?" test.
+
+A valid edge should make one of these relations explicit:
+
+- attack evolution -> need for defense coverage;
+- defense landscape -> selected cleansing family;
+- selected family -> known limitation;
+- limitation -> next family or unresolved gap.
+
+Trigger when "therefore" or a subsection change jumps between levels without establishing the relation, or when the reader must infer how two named research categories relate.
+
+Hard specificity pattern: evidence or conclusions stated for a broad `defense` landscape do not automatically establish requirements for one narrower family such as training-data cleansing. A transition of the form `attack/trigger/label mapping affects defense results -> therefore cleansing methods must handle ...` needs an explicit bridge showing why that evidence applies to cleansing and how the named trigger properties affect its operational objective. Without that relation, trigger R03 even if the concluding requirement sounds plausible.
+
+Output:
+
+X -> [missing relation] -> Y
+
+and name the relation needed: parent-child, contrast, narrowing, consequence, or complement.
+
+## R04 — Method-detail leakage into Related Work
+
+Trigger when Related Work contains implementation-level details of the proposed method:
+
+- exact internal branch behavior;
+- detailed scoring logic;
+- algorithm sequence;
+- component interactions;
+- selection/fusion mechanism;
+- design parameters better explained in Method.
+
+Allowed:
+one or two high-level positioning sentences needed to distinguish the paper from the nearest work.
+
+Disallowed:
+a mini-Method section embedded in literature review.
+
+Recommendation:
+move mechanism detail to Method and keep only the comparison axis or research gap.
+
+## R05 — Subsection proportionality and compression
+
+Trigger when a Related Work subsection is materially longer or more detailed than needed to establish its role in the literature argument.
+
+Compression test:
+
+1. Identify the subsection's required rhetorical output.
+2. Remove examples/details that do not change that output.
+3. If the same gap/position remains, recommend compression.
+
+Do not flag detail merely because the subsection is long. Flag detail that does not change taxonomy, gap, or positioning.
+
+## 7.1 Related Work execution
+
+Before comments, create:
+
+| Subsection | Claimed scope | Literature role | Taxonomy/coverage | Own-method leakage | Transition quality | Compression |
+
+Coverage line:
+R01-R05 + X01-X03 + relevant S-rules.
+
+---
+
+# 8. Section architecture and ownership
+
+## S01 — Section-role ownership
+
+Each section should perform its own job.
+
+Default roles:
+
+- Introduction: establish context, landscape, gap, approach, contributions.
+- Related Work: organize prior literature and derive positioning/gaps.
+- Problem Formulation / Threat Model: define task, actors, capabilities, assumptions, inputs/outputs, notation, evaluation objective if needed.
+- Method: explain the proposed mechanism, components, algorithms, and implementation logic.
+- Experiments: report setup, evidence, comparisons, ablations, and results.
+
+Trigger when content clearly belongs to a later/earlier section.
+
+Examples:
+
+- detailed proposed-method mechanics in Related Work -> move to Method;
+- method-specific operational steps in Problem Formulation -> move to Method;
+- generic task definition repeated after the Introduction has already narrowed to the gap -> move earlier or compress.
+
+## S02 — Section-opening and section-closing discipline
+
+Trigger when:
+
+- a section opening contains unnecessary meta prose before the substantive problem;
+- a subsection ends with an unrelated preview of the author's method;
+- a closing sentence does not prepare the next rhetorical move.
+
+Prefer a substantive opening. Use a closing transition only when it carries a real logical relation.
+
+Co-trigger rule: when the closing sentence of Related Work replaces a substantive literature/gap closure with author-side staging such as `our method has ...; Section 3 presents ...; Section 4 evaluates ...`, trigger S02 for the failed section closing. X03 may co-trigger for empty navigation and R02 may co-trigger for premature own-method voice; neither substitutes for S02 when the failure is specifically at the section boundary.
+
+## S03 — Boundary between problem definition and solution design
+
+Problem Formulation should define what must be solved, under what assumptions, and what output is required.
+
+Method should define how it is solved.
+
+Trigger when problem formulation starts justifying or detailing specific internal components before the problem/defender/attacker model is complete, or when Method must retroactively define basic task assumptions that should have appeared earlier.
+
+Boundary ledger:
+
+| Statement | Problem/assumption | Solution/design | Correct section? |
+
+---
+
+# 9. Professor-comment interpretation protocol
+
+For every professor comment, produce:
+
+1. Comment target: exact phrase/sentence and location.
 2. Surface issue: what appears wrong locally.
-3. Root cause: the deeper argument, structure, evidence, or information-design problem.
-4. Generalizable rule: which section-specific A-rule or I-rule this comment represents.
-5. Revision criterion: what must become true for the comment to count as resolved.
+3. Root cause: deeper logic, evidence, organization, or section-role problem.
+4. Primary rule ID.
+5. Secondary rule ID(s), if useful.
+6. Revision criterion: what must become true for the comment to count as resolved.
 
-Do not treat the professor's wording as a simple copy-edit instruction when the surrounding context shows a deeper reasoning issue.
+Do not reduce a structural comment to copy-editing.
 
-## 8. Revision comparison protocol
+When the professor says "logic does not hold", explicitly reconstruct the attempted inference and missing premise.
 
-When both an earlier and a revised version of an in-scope section exist:
+When the professor says "do not use this/they/it", first test X01 rather than treating it as a universal ban on pronouns.
 
-For each prior comment, label the revision as:
+---
 
-- Resolved: the underlying problem is removed.
-- Partially resolved: wording changed but the logical or evidential issue remains.
-- Reframed: the original issue was avoided by restructuring the passage.
-- Unresolved: the same underlying problem remains.
-- New issue introduced: the revision fixes one problem but creates another.
+# 10. Revision comparison protocol
 
-A lexical change is not sufficient evidence of resolution.
+When earlier and revised versions exist, label each prior issue:
 
-## 9. Required output format
+- Resolved.
+- Partially resolved.
+- Reframed.
+- Unresolved.
+- New issue introduced.
 
-Use A-G when the Abstract is in scope. Use H when the Introduction is in scope. When both are present, produce both section outputs before cross-section synthesis.
+A lexical change is not enough. The underlying logic, role, evidence, or section placement must be fixed.
 
-### A. Overall diagnosis
+Hard revision check — lexical weakening is not resolution:
 
-Give a concise judgment of the in-scope section's main structural weakness, not a generic language-quality statement. If both Abstract and Introduction are in scope, give one sentence for each before cross-section synthesis.
+- `small` -> `limited`;
+- `effective` -> `useful`;
+- `robust` -> `stable`;
+- replacing one causal connector with a softer connector.
 
-### B. Argument-chain reconstruction
+If the underlying proposition and its evidence gap remain the same, label the issue Partially resolved, Reframed, or Unresolved rather than Resolved. Re-run the original rule against the revised proposition, not merely against the revised adjective or connector.
 
-Show:
-B -> P -> G -> M -> R -> C
+---
 
-Mark missing or weak links explicitly.
+# 11. Required output format
 
-### C. Comment-by-comment analysis
+Use only the parts applicable to the supplied sections.
 
-Use columns:
+## A. Overall diagnosis
 
-Location | Original text | Professor comment | Surface issue | Root cause | Rule ID | Revision criterion
+One concise structural judgment per in-scope section.
 
-### D. Problem-solution matrix
+## B. Argument / section reconstruction
 
-Use columns:
+- Abstract: B -> P -> G -> M -> R -> C.
+- Introduction: L0-L5 scope chain.
+- Related Work: taxonomy/landscape -> limitations -> unresolved gap.
+- Problem/Method boundary: task/assumptions -> output -> method.
 
-Problem/gap | Method response | Evidence in abstract | Mapping quality
+## C. Comment-by-comment analysis
 
-### E. Claim-evidence consistency table
+| Location | Original text | Professor comment | Surface issue | Root cause | Primary rule | Revision criterion |
 
-Use columns:
+## D. Required ledgers
 
-Claim | Evidence in manuscript | Supported / weak / unsupported | Recommendation
+Include the module-specific ledgers required above.
 
-### F. Revision recommendations
+## E. Claim-evidence consistency
 
-Separate into:
+| Claim | Evidence in manuscript | Supported / weak / unsupported | Recommendation |
 
-- Must fix: logical break, unsupported claim, incorrect mapping, misleading experiment description.
-- Should fix: concept overload, unnecessary sentence, weak transition.
-- Optional polish: wording, concision, syntax, terminology.
+## F. Revision priorities
 
-### G. Suggested rewrite
+- Must fix: invalid logic, unsupported claim, wrong section ownership, broken challenge-contribution closure, broken taxonomy.
+- Should fix: weak transition, premature self-positioning, concept overload, unnecessary repetition, compression.
+- Optional polish: wording, syntax, concision, terminology after logic is fixed.
 
-Only produce a rewritten abstract or replacement sentences if requested, or if the task explicitly asks for revision text.
+## G. Suggested rewrite
 
-The rewrite must not introduce new experimental claims, new contributions, new datasets, new baselines, or new causal conclusions that are absent from the source manuscript.
+Only rewrite when the user requests revision text or when replacement text is explicitly part of the task.
 
-### H. Introduction review output (when an Introduction is in scope)
+Do not invent new experiments, claims, contributions, datasets, baselines, or causal conclusions.
 
-Before free-form Introduction comments, include:
+---
 
-1. Introduction ledger: Paragraph | Main function | Scope level | New information beyond abstract | Link from previous paragraph | Status.
-2. Abstract-Introduction overlap ledger for I01 when the Abstract is available.
-3. I01 verdict with SAME/MIXED/NEW counts, approximate overlap ratio R, and compression-test result.
-4. I02 verdict with the L0-L5 scope chain and any missing layer.
-5. I03 verdict for every adjacent paragraph edge, including X, Y, edge class, and any missing bridge R.
-6. A final Introduction coverage line stating Triggered / Checked-no-trigger / Not-evaluable for I01-I03.
+# 12. Review priorities
 
-When both sections are reviewed, keep Abstract and Introduction findings separate before giving any cross-section synthesis.
+1. Logical validity and concept-role correctness.
+2. Section ownership and rhetorical order.
+3. Problem/challenge -> method/contribution correspondence.
+4. Claim-evidence consistency.
+5. Literature taxonomy and transition coherence.
+6. Information density and necessity.
+7. Experimental clarity and quantitative evidence.
+8. Explicit referents and local readability.
+9. Grammar and stylistic polish.
 
-## 10. Review priorities
+Do not begin with grammar when a higher-level problem exists.
 
-Priority order:
+---
 
-1. Logical validity.
-2. Problem-method correspondence.
-3. Claim-evidence consistency.
-4. Information density and necessity.
-5. Experimental clarity.
-6. Overclaiming control.
-7. Language and style.
+# 13. Professor-style patterns learned from the current evidence set
 
-Do not begin with grammar corrections when a higher-level problem exists.
+The current annotation set supports the following recurring preferences:
 
-## 11. Current professor-style patterns learned from the provided examples
+- Prefer explicit technical nouns over ambiguous short references when the referent is not uniquely obvious.
+- Do not let a connector word or pronoun carry missing logic.
+- Distinguish the privacy/security requirement from the utility/fidelity objective instead of conflating them in one causal claim.
+- In Abstract results, prefer direct quantitative evidence to vague author-side evaluation.
+- The Introduction should not replay the Abstract opening nearly verbatim.
+- Explicitly close stated challenges/research questions with corresponding contributions.
+- Define the target task/defense setting early enough; once the concrete gap is reached, introduce the proposed work rather than backtracking to generic setup.
+- In Related Work, keep taxonomy levels and section titles coherent.
+- Related Work should describe prior work and gaps objectively; minimize "our method/our evaluation" until a concise closing positioning sentence.
+- Do not put detailed proposed-method mechanics in Related Work or Problem Formulation.
+- Compress literature discussion that does not change the taxonomy, gap, or positioning.
+- Remove empty meta-navigation unless it performs a necessary structural function.
 
-From the supplied DPRC and MARU examples, the observed review preference is:
+These are learned preferences from the supplied manuscripts and annotations, not universal laws. Future professor comments may refine or override them.
 
-- do not force the reader to infer why a module exists;
-- do not let a connective word substitute for an actual causal chain;
-- do not explain basic terminology if it consumes abstract space without advancing the argument;
-- do not turn implementation detail into the main method narrative;
-- do not advertise a property unless the paper actually demonstrates it;
-- do not use author-side value labels when direct evidence is available;
-- make experiment counts interpretable;
-- when multiple problems are stated, make their corresponding designs traceable;
-- the Introduction should add a distinct rhetorical function instead of replaying the Abstract's motivation chain;
-- move from broad problem to solution/research landscape before narrowing to one selected subarea unless the scope restriction is explicitly justified;
-- at paragraph boundaries, make the "why now?" relation explicit when a new technical limitation or mechanism appears.
+---
 
-These patterns are evidence from the current Abstract and Introduction example set, not universal academic-writing laws. If future professor comments contradict or refine them, update this section rather than forcing new examples into old rules.
-
-## 12. Non-invention constraints
+# 14. Non-invention constraints
 
 The skill must not:
 
-- invent missing professor intent when the comment is ambiguous;
-- invent experimental evidence to justify an abstract claim;
-- assume a design solves a stated problem unless the manuscript supports the relationship;
-- infer superiority from a single metric without the paper making that comparison;
-- treat stylistic preference as a universal rule when it appears specific to this professor or manuscript;
-- rewrite a claim more strongly than the source evidence supports.
+- invent professor intent when the annotation is ambiguous;
+- invent experimental evidence;
+- assume a design solves a stated problem without textual support;
+- infer superiority from one metric unless the manuscript makes that comparison;
+- turn a local professor preference into a universal academic rule without marking it as a learned preference;
+- strengthen a claim beyond source evidence;
+- move text between sections without explaining which section role is violated.
 
-When uncertain, output: "The current materials do not establish this point clearly." and identify what evidence would be needed.
+When uncertain, state:
 
-## 13. Regression and blind-evaluation protocol
+"The current materials do not establish this point clearly."
 
-Keep regression fixtures and expected outcomes outside the Skill file used by the reviewer. The reviewer-facing Skill must not contain target sentences, withheld comments, gold labels, or case-specific expected verdicts.
+Then specify what evidence or bridge would be needed.
 
-For blind regression:
+---
 
-- provide only this Skill plus annotation-free manuscript text and explicitly permitted manuscript evidence;
-- keep professor/supervisor comments and gold decisions in an evaluator-only file that is never included in the reviewer prompt;
-- run section modules according to the routing rules in Section 3;
-- when both Abstract and Introduction are present, verify that adding the second module does not change previously validated decisions in the first module without textual reason;
-- repeat borderline cases across multiple independent runs and report hit frequency rather than relying on a single run;
-- include positive and negative controls so that a rule is tested for both recall and false-positive behavior;
-- when synthetic controls are used, change domain vocabulary and surface phrasing while preserving the underlying argument structure.
+# 15. Regression protocol
 
-The evaluator may compare blind outputs with withheld labels only after each run has finished.
+Keep regression fixtures and expected labels outside this reviewer-facing Skill file.
+
+Blind regression should include:
+
+- positive and negative controls for X01 and X02;
+- Abstract cases for A01-A10;
+- Introduction cases for I01-I05;
+- Related Work cases for R01-R05;
+- section-boundary cases for S01-S03;
+- repeated borderline runs to assess stability;
+- synthetic controls that change vocabulary while preserving argument structure.
+
+For professor-comment regression, score:
+
+- comment recall: did the rule set identify the professor's underlying issue?
+- rule precision: did it avoid flagging nearby text that the comment does not support?
+- section-placement accuracy: did it identify where the material belongs?
+- explanation quality: did it reconstruct the missing causal or rhetorical link rather than merely echoing the comment?
+
+Decision-boundary guardrails for blind runs:
+
+- A02: ordinary scientific uncertainty or one local hedge is not enough; the motivation itself must depend on a stack of weak hypothetical premises.
+- A04: do not require one-to-one cardinality. Do not trigger when each stated problem is explicitly answered, even if one design answers multiple problems or one problem requires multiple designs.
+- A05: naming several components is not enough when the core mechanism is already clear and each name is interpretable in that mechanism.
+- A06: sequence words such as `first` and `then` are not enough when purpose and consequence are also explicit.
+- A07: do not flag a component whose nearest need and output are stated locally.
+- A09: a number such as `48 settings` is acceptable when its composition is stated in the same or immediately adjacent sentence.
+- S01/S03: a high-level preview or cross-reference is not a section-ownership violation; trigger only when substantive solution detail occupies the wrong section or task assumptions are deferred into Method.
+- S02: a section-closing sentence is acceptable when it carries a substantive narrowing, contrast, or gap; do not require deletion merely because it prepares the next section.
+
+The evaluator may compare blind outputs with withheld annotations only after each run has finished.
